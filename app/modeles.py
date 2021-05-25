@@ -1,10 +1,12 @@
-from typing_extensions import ParamSpecArgs
 import requests
 from bs4 import BeautifulSoup
 from app.utils import get_component
+import re
+import json
+
 class Product():
     def __init__(self,product_id,product_name = None,opinions = [],
-    opinions_count=None,pros_count=None,cons_count=None,average_score=None):
+    opinions_count=None,pros_count=None,cons_count=None, average_score=None):
         self.product_id = product_id
         self.product_name = product_name
         self.opinions = opinions
@@ -22,40 +24,46 @@ class Product():
                 opinions = page_dom.select("div.js_product-review")
                 
                 for opinion in opinions:
-                    single_opinion={key:get_component(opinion,*value)
-                                    for key,value in selectors.items()
-                    }
-                    
-                    single_opinion["uselessness"]=int(single_opinion["uselessness"])
-                    single_opinion["usefulness"]=int(single_opinion["usefulness"])
-                    single_opinion["verified"]=bool(single_opinion["verified"])
-                    single_opinion["recomendation"] = True if single_opinion["recomendation"]=="Polecam" else False if single_opinion["recomendation"] == "Nie polecam" else None
-                    single_opinion["stars"] = float(single_opinion["stars"].split("/")[0].replace(",","."))
-                    single_opinion["content"] = re.sub("\\s"," ",single_opinion["content"])
-                    self.opinions.append(single_opinion)
+                    self.opinions.append(Opinion().extract_components(opinion).transform_components())
                 page +=1
             else: break
-    def load_opinions(self):
-        pass
-    def analyse(self):
-        pass
-    def get_pie(self):
-        pass
-    def get_bar(self):
-        pass
-    def save_csv(self):
-        pass
-    def save_xlsx(self):
-        pass
-    def save_json(self):
-        pass
-    def __dict__(self):
-        pass
-    #reprezentacja słownikowa
+        return self
+    def to_dict(self):
+        return{
+            "product_id": self.product_id,
+            "product_name": self.product_name,
+            "opinions_count": self.opinons_count,
+            "pros_count": self.pros_count,
+            "cons_count": self.cons_count,
+            "avarage_score": self.average_score,
+            "opinions": [opinion.to_dict() for opinion in self.opinions]
+         }
     def __str__(self):
-        pass
+        return f"""product_id: {self.product_id}<br>
+        product_name: {self.product_name}<br>
+        opinions_count: {self.opinons_count}<br>
+        pros_count: {self.pros_count}<br>
+        cons_count: {self.cons_count}<br>
+        avarage_score: {self.average_score}<br>
+        opinions: <br><br>
+        """ + "<br><br>".join(str(opinion) for opinion in self.opinions)
     def __repr__(self):
-        pass
+        return f"Product(product_id={self.product_id}, product_name={self.product_name}, opinions_count={self.opinons_count}, pros_count={self.pros_count}, cons_count={self.cons_count}, avarage_score={self.average_score}, opinions: [" + ", ".join(str(opinion) for opinion in self.opinions) + "])"
+
+    def export_to_json(self):
+        with open(f"app/products/{self.product_id}.json", "w", encoding="UTF-8") as jf:
+            json.dump(self.to_dict(), jf, ensure_ascii=False, indent=4)
+    
+    def analyze(self):
+        self.opinion_count = self.opinions.shape[0]
+        self.pros_count = self.opinions.pros.map(bool).sum()
+        self.cons_count = self.opinions.cons.map(bool).sum()
+        self.average_score = self.opinions.stars.mean()
+        return self
+
+
+
+
 class Opinion():
     selectors={
     "author":["span.user-post__author-name"],
@@ -83,12 +91,31 @@ class Opinion():
         self.uselessness = uselessness
         self.pros = pros
         self.cons = cons
-    def extract_components(self):
-        pass
-    def __dict__(self):
-        pass
-    #reprezentacja słownikowa
-    def __str__(self):
-        pass
-    def __repr__(self):
-        pass
+
+    def extract_components(self,opinion):
+        for key,value in self.selectors.items():
+            setattr(self, key, get_component(opinion, *value))
+        self.opinon_id = opinion["data-entry-id"]
+        return self
+
+    def transform_components(self):
+        self.uselessness=int(self.uselessness)
+        self.usefulness=int(self.usefulness)
+        self.verified = bool(self.verified)
+        self.recomendation = True if self.recomendation=="Polecam" else False if self.recomendation == "Nie polecam" else None
+        self.stars = float(self.stars.split("/")[0].replace(",","."))
+        self.content = re.sub("\\s"," ", self.content)
+        return self
+
+    def to_dict(self):
+        return {"opinion_id": self.opinon_id} | {key: getattr(self,key)
+                            for key in self.selectors.keys()
+            }
+
+    def __repr__(self) -> str:
+        return f"Opinion(opinion_id={self.opinon_id}, " + ", ".join(f"{key}, {str(getattr(self,key))}"
+        for key in self.selectors.keys()+")")
+
+    def __str__(self) -> str:
+        return f"opinion_id: {self.opinon_id}<br>" + "<br>".join(f"{key}: {str(getattr(self,key))}"
+        for key in self.selectors.keys())
