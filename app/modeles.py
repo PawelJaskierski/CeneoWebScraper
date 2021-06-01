@@ -55,10 +55,10 @@ class Product():
             json.dump(self.to_dict(), jf, ensure_ascii=False, indent=4)
     
     def analyze(self):
-        self.opinion_count = self.opinions.shape[0]
-        self.pros_count = self.opinions.pros.map(bool).sum()
-        self.cons_count = self.opinions.cons.map(bool).sum()
-        self.average_score = self.opinions.stars.mean()
+        self.opinion_count = len(self.opinions)
+        #self.pros_count = self.opinions.pros.map(bool).sum()
+        #self.cons_count = self.opinions.cons.map(bool).sum()
+        #self.average_score = self.opinions.stars.mean()
         return self
 
 
